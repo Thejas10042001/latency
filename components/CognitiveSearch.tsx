@@ -75,15 +75,10 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
     fetchSuggestions();
   }, [readyFiles, context]);
 
-  /**
-   * Simple partial JSON text extractor.
-   * Looks for the "answer" field and streams its content.
-   */
   const extractFieldFromPartialJson = (json: string, field: string): string => {
     const regex = new RegExp(`"${field}"\\s*:\\s*"(.*?)("|,|\\n|$)`, "i");
     const match = json.match(regex);
     if (match && match[1]) {
-      // Basic unescaping for display
       return match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
     }
     return "";
@@ -107,11 +102,9 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
       for await (const chunk of stream) {
         fullBuffer += chunk;
         
-        // Update the streaming display with partial fields
         const partialAnswer = extractFieldFromPartialJson(fullBuffer, "answer");
         const partialSoundbite = extractFieldFromPartialJson(fullBuffer, "articularSoundbite");
         
-        // We use a pseudo-result to show the UI cards early if possible
         if (partialAnswer || partialSoundbite) {
           setStreamingText(partialAnswer);
           setResult(prev => ({
@@ -119,14 +112,16 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
             answer: partialAnswer,
             articularSoundbite: partialSoundbite || (prev?.articularSoundbite || ""),
             briefExplanation: extractFieldFromPartialJson(fullBuffer, "briefExplanation"),
+            nuancedAnalysis: extractFieldFromPartialJson(fullBuffer, "nuancedAnalysis"),
             psychologicalProjection: prev?.psychologicalProjection || { buyerFear: "...", buyerIncentive: "...", strategicLever: "..." },
+            secondOrderEffects: prev?.secondOrderEffects || [],
+            tacticalRoadmap: prev?.tacticalRoadmap || [],
             citations: prev?.citations || [],
             reasoningChain: prev?.reasoningChain || { painPoint: "...", capability: "...", strategicValue: "..." }
           } as CognitiveSearchResult));
         }
       }
       
-      // Final parse to ensure everything is correct
       try {
         const finalResult = JSON.parse(fullBuffer);
         setResult(finalResult);
@@ -202,6 +197,53 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
             <ProjectionCard label="Conversational Lever" content={result?.psychologicalProjection?.strategicLever || "..."} color="indigo" icon={<ICONS.Trophy />} />
           </div>
 
+          {/* New Nuanced Analysis Section for Detailed Answers */}
+          {result?.nuancedAnalysis && (
+            <div className="bg-slate-900/5 backdrop-blur-sm border border-slate-200 rounded-[3.5rem] p-12 space-y-6">
+              <h5 className="text-[12px] font-black text-slate-500 uppercase tracking-[0.4em] flex items-center gap-3">
+                <ICONS.Brain className="w-4 h-4" /> Comprehensive Nuance Analysis
+              </h5>
+              <div className="text-slate-700 font-medium text-lg leading-relaxed whitespace-pre-wrap font-serif italic border-l-4 border-indigo-200 pl-8">
+                {result.nuancedAnalysis}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Tactical Roadmap */}
+            <div className="bg-white rounded-[3rem] p-12 shadow-xl border border-slate-100">
+               <h5 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-8">Tactical Engagement Sequence</h5>
+               <div className="space-y-6">
+                 {result?.tacticalRoadmap?.map((item, i) => (
+                   <div key={i} className="flex gap-6 group">
+                      <div className="flex flex-col items-center">
+                        <div className="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-lg">{i+1}</div>
+                        {i < result.tacticalRoadmap.length - 1 && <div className="flex-1 w-0.5 bg-slate-100 my-2"></div>}
+                      </div>
+                      <div className="pb-6">
+                         <p className="text-xs font-black uppercase text-slate-400 tracking-widest mb-1">{item.step}</p>
+                         <p className="text-md font-bold text-slate-900 mb-2">“{item.action}”</p>
+                         <p className="text-xs text-slate-500 italic">Result: {item.expectedOutcome}</p>
+                      </div>
+                   </div>
+                 ))}
+               </div>
+            </div>
+
+            {/* Second-Order Effects */}
+            <div className="bg-slate-50 rounded-[3rem] p-12 shadow-inner border border-slate-200">
+               <h5 className="text-[11px] font-black text-emerald-600 uppercase tracking-[0.3em] mb-8">Second-Order Business Ripples</h5>
+               <div className="space-y-6">
+                 {result?.secondOrderEffects?.map((item, i) => (
+                   <div key={i} className="p-6 bg-white rounded-3xl border border-emerald-100 shadow-sm">
+                      <p className="text-sm font-black text-slate-900 mb-2">{item.impact}</p>
+                      <p className="text-xs text-slate-500 leading-relaxed font-medium italic">“{item.reasoning}”</p>
+                   </div>
+                 ))}
+               </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-[4rem] p-16 shadow-2xl border border-slate-200 relative overflow-hidden">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16 border-b border-slate-100 pb-12">
                <div className="flex items-center gap-4">
@@ -237,7 +279,12 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                           <ICONS.Document className="w-3 h-3" /> {cit.source}
                         </p>
-                        <p className="text-md text-slate-600 leading-relaxed font-serif italic">“{cit.snippet}”</p>
+                        <p className="text-md text-slate-600 leading-relaxed font-serif italic mb-4">“{cit.snippet}”</p>
+                        {cit.significance && (
+                          <div className="pt-4 border-t border-slate-200 text-[10px] text-slate-500 font-bold uppercase tracking-tight">
+                            Strategic Utility: {cit.significance}
+                          </div>
+                        )}
                      </div>
                    ))}
                  </div>
