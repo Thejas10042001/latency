@@ -52,7 +52,7 @@ export interface CognitiveSearchResult {
 
 /**
  * Low-Latency Cognitive Search using Gemini 3 Flash.
- * Optimized for speed and persona-aligned depth.
+ * Balanced for extreme speed and enhanced reasoning depth.
  */
 export async function* performCognitiveSearchStream(
   question: string, 
@@ -66,34 +66,40 @@ export async function* performCognitiveSearchStream(
   - Seller: ${context.sellerNames} from ${context.sellerCompany}
   - Prospect: ${context.clientNames} from ${context.clientCompany} (Persona: ${context.persona})
   - Focus: ${context.meetingFocus}
+  - Strategy: ${context.executiveSnapshot}
   
   TASK: Synthesize a high-density, persona-aligned response to: "${question}". 
-  Provide a detailed explanation that is also brief and easy for the customer to understand.
-  Use the following structure headers:
+  Provide a rigorous analysis that uncovers non-obvious strategic links.
+  
+  REQUIRED STRUCTURE:
   ${styleDirectives}
 
   SOURCE DOCUMENTS:
   ${filesContent}
 
-  OUTPUT REQUIREMENT: Respond in a valid JSON object format containing:
-  - articularSoundbite: A powerful 1-sentence verbatim hook.
-  - briefExplanation: A 2-3 sentence executive summary.
-  - answer: The full detailed analysis following the requested headers.
-  - psychologicalProjection: { buyerFear, buyerIncentive, strategicLever }
-  - citations: Array of { snippet, source }
-  - reasoningChain: { painPoint, capability, strategicValue }`;
+  JSON OUTPUT SCHEMA (MUST BE VALID):
+  {
+    "articularSoundbite": "Powerful 1-sentence verbatim hook for the salesperson.",
+    "briefExplanation": "2-3 sentence high-level strategic executive summary.",
+    "answer": "The full detailed analysis following requested headers with Markdown.",
+    "psychologicalProjection": { "buyerFear": "...", "buyerIncentive": "...", "strategicLever": "..." },
+    "citations": [ { "snippet": "...", "source": "..." } ],
+    "reasoningChain": { "painPoint": "...", "capability": "...", "strategicValue": "..." }
+  }`;
 
   try {
     const result = await ai.models.generateContentStream({
       model: modelName,
       contents: prompt,
       config: {
-        systemInstruction: `You are a world-class Cognitive Sales Intelligence Agent. 
-        Your goal is ULTRA-LOW LATENCY responses. 
-        Always align your logic with the buyer persona: ${context.persona}.
-        Be precise, grounded in documents, and strategic.`,
+        systemInstruction: `You are a world-class Senior Cognitive Sales Strategist. 
+        Your goal is to provide ADVANCED reasoning depth while maintaining ultra-low latency. 
+        Think deeply about the hidden motivations of the ${context.persona} persona.
+        Avoid clichés. Be authoritative, grounded in source data, and use senior executive vocabulary.`,
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 0 } // Priority on instant output
+        // Enhanced Reasoning: 2048 tokens allows the model to process logic chains 
+        // without significantly slowing down the first-token-to-render time.
+        thinkingConfig: { thinkingBudget: 2048 } 
       }
     });
 
@@ -102,7 +108,7 @@ export async function* performCognitiveSearchStream(
     }
   } catch (error) {
     console.error("Streaming search failed:", error);
-    throw new Error("Search failed.");
+    throw new Error("Cognitive Engine failed to synthesize. Check source integrity.");
   }
 }
 
@@ -122,7 +128,7 @@ export async function performCognitiveSearch(
 
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
   const modelName = 'gemini-3-flash-preview';
-  const prompt = `Suggest 3 strategic sales questions for ${context.clientCompany} based on their inferred profile. Return as a JSON array of strings.`;
+  const prompt = `Based on the documents, suggest 3 highly strategic, non-obvious sales questions for ${context.clientCompany || 'the prospect'}. Return as a JSON array of strings.`;
   const response = await ai.models.generateContent({ 
     model: modelName, 
     contents: prompt, 
@@ -155,7 +161,7 @@ export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampl
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Explain the strategy behind: "${question}" based on the buyer snapshot: ${JSON.stringify(context.snapshot)}. Keep it authoritative and brief.`,
+    contents: `Explain the deep sales strategy behind: "${question}" based on the buyer snapshot: ${JSON.stringify(context.snapshot)}. Keep it authoritative and brief.`,
     config: { thinkingConfig: { thinkingBudget: 0 } }
   });
   return response.text || "";
