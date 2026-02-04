@@ -81,6 +81,8 @@ export interface ObjectionPair {
   realMeaning: string;
   strategy: string;
   exactWording: string;
+  empathyTip: string;
+  valueTip: string;
   citation: Citation;
 }
 

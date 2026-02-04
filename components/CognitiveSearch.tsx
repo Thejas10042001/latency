@@ -104,23 +104,50 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
   };
 
   /**
-   * Robust JSON parser for final stream buffer
+   * Robust JSON parser for final stream buffer.
+   * Leverages position info from SyntaxErrors to prune trailing content.
    */
   const robustParse = (str: string) => {
-    const trimmed = str.trim();
-    try {
-      return JSON.parse(trimmed);
-    } catch (e) {
-      const match = trimmed.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          return JSON.parse(match[0]);
-        } catch (innerE) {
-          return null;
+    let trimmed = str.trim();
+    if (!trimmed) return null;
+
+    const tryParse = (input: string) => {
+      try {
+        return JSON.parse(input);
+      } catch (e: any) {
+        const posMatch = e.message.match(/at position (\d+)/);
+        if (posMatch) {
+          const pos = parseInt(posMatch[1], 10);
+          try {
+            return JSON.parse(input.substring(0, pos));
+          } catch (innerE) {
+            return null;
+          }
         }
+        return null;
       }
-      return null;
+    };
+
+    // 1. Direct parse
+    let res = tryParse(trimmed);
+    if (res) return res;
+
+    // 2. Markdown stripping
+    if (trimmed.includes("```")) {
+      const clean = trimmed.replace(/```(?:json)?([\s\S]*?)```/g, '$1').trim();
+      res = tryParse(clean);
+      if (res) return res;
     }
+
+    // 3. Brace fallback
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      res = tryParse(trimmed.substring(firstBrace, lastBrace + 1));
+      if (res) return res;
+    }
+
+    return null;
   }
 
   const handleSearch = async (e?: FormEvent, customQuery?: string) => {

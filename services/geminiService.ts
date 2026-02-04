@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, MeetingContext, ThinkingLevel } from "../types";
+import { AnalysisResult, MeetingContext, ThinkingLevel, GPTMessage } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -12,29 +12,60 @@ const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
 };
 
 /**
- * Robustly parses JSON from a string, handling markdown wrappers or trailing characters.
+ * Robustly parses JSON from a string, handling markdown wrappers, prefix/suffix text,
+ * and the specific 'Unexpected non-whitespace character after JSON' error.
  */
 function safeJsonParse(str: string) {
-  const trimmed = str.trim();
-  try {
-    return JSON.parse(trimmed);
-  } catch (e) {
-    // Try to extract the first JSON object match
-    const match = trimmed.match(/\{[\s\S]*\}/);
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch (innerE) {
-        // If it's an array, try to extract array match
-        const arrayMatch = trimmed.match(/\[[\s\S]*\]/);
-        if (arrayMatch) {
-           try { return JSON.parse(arrayMatch[0]); } catch (thirdE) { throw thirdE; }
+  let trimmed = str.trim();
+  if (!trimmed) return {};
+
+  const tryParse = (input: string) => {
+    try {
+      return JSON.parse(input);
+    } catch (e: any) {
+      const posMatch = e.message.match(/at position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1], 10);
+        try {
+          return JSON.parse(input.substring(0, pos));
+        } catch (innerE) {
+          return null;
         }
-        throw innerE;
       }
+      return null;
     }
-    throw e;
+  };
+
+  let result = tryParse(trimmed);
+  if (result) return result;
+
+  if (trimmed.includes("```")) {
+    const clean = trimmed.replace(/```(?:json)?([\s\S]*?)```/g, '$1').trim();
+    result = tryParse(clean);
+    if (result) return result;
   }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    result = tryParse(trimmed.substring(firstBrace, lastBrace + 1));
+    if (result) return result;
+  }
+
+  const firstBracket = trimmed.indexOf('[');
+  const lastBracket = trimmed.lastIndexOf(']');
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    result = tryParse(trimmed.substring(firstBracket, lastBracket + 1));
+    if (result) return result;
+  }
+
+  const match = trimmed.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  if (match) {
+    result = tryParse(match[0]);
+    if (result) return result;
+  }
+
+  throw new Error("Failed to parse cognitive intelligence response as valid JSON.");
 }
 
 export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
@@ -59,19 +90,41 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
   }
 }
 
-// Sales GPT: Fast Standard Chat
-export async function* streamSalesGPT(prompt: string, context?: string): AsyncGenerator<string> {
+/**
+ * Converts internal GPTMessage history to Gemini Content format.
+ */
+function formatHistory(history: GPTMessage[]) {
+  return history.map(msg => ({
+    role: msg.role === 'user' ? 'user' : 'model',
+    parts: [{ text: msg.content }]
+  }));
+}
+
+// Sales GPT: Fast Standard Chat with History and Context
+export async function* streamSalesGPT(prompt: string, history: GPTMessage[], context?: string): AsyncGenerator<string> {
   const modelName = 'gemini-3-flash-preview';
-  const contents = context 
-    ? `CONTEXT FROM DOCUMENTS:\n${context}\n\nUSER QUESTION: ${prompt}`
-    : prompt;
+  
+  const contents = [
+    ...formatHistory(history),
+    { role: 'user', parts: [{ text: prompt }] }
+  ];
+
+  const systemInstruction = `You are Sales GPT, an elite sales intelligence agent. 
+  ${context ? `GROUNDING DATA PROVIDED: Below is the content of the relevant documents. 
+  PRIORITIZE using this information to answer user queries. If the answer is contained in the documents, cite the document name or section if possible.
+  
+  --- DOCUMENT CONTEXT ---
+  ${context}
+  -----------------------` : ""}
+  
+  Be concise, authoritative, and strategic. If asked something unrelated to the documents, you may answer using your general knowledge but clearly state if the information was not found in the provided files.`;
 
   try {
     const result = await ai.models.generateContentStream({
       model: modelName,
       contents: contents,
       config: {
-        systemInstruction: "You are Sales GPT, a fast and helpful AI specialized in sales intelligence and general inquiries. Be concise, professional, and authoritative.",
+        systemInstruction: systemInstruction,
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
@@ -111,24 +164,32 @@ export async function generatePineappleImage(prompt: string): Promise<string | n
   }
 }
 
-// Deep Study: Heavy Reasoning
-export async function* streamDeepStudy(prompt: string, context?: string): AsyncGenerator<string> {
+// Deep Study: Heavy Reasoning with History and Context
+export async function* streamDeepStudy(prompt: string, history: GPTMessage[], context?: string): AsyncGenerator<string> {
   const modelName = 'gemini-3-pro-preview';
-  const contents = context 
-    ? `CONTEXT FOR DEEP RESEARCH:\n${context}\n\nRESEARCH TOPIC: ${prompt}`
-    : prompt;
+  
+  const contents = [
+    ...formatHistory(history),
+    { role: 'user', parts: [{ text: prompt }] }
+  ];
+
+  const systemInstruction = `You are a world-class Strategic Research Analyst. 
+  TASK: Perform a deep, detailed study on the topic using provided document context and reasoning.
+  
+  ${context ? `--- DOCUMENT CONTEXT ---
+  ${context}
+  -----------------------
+  Use the above grounding data for technical depth and strategic analysis.` : ""}
+  
+  Explain from BASIC to ADVANCED concepts. Be extremely thorough and professional.`;
 
   try {
     const result = await ai.models.generateContentStream({
       model: modelName,
       contents: contents,
       config: {
-        systemInstruction: `You are a world-class Research Analyst. 
-        TASK: Perform a deep, detailed study on the topic. 
-        Explain from BASIC to ADVANCED concepts. 
-        Provide data-driven insights, technical depth, and strategic implications. 
-        Be extremely thorough and professional.`,
-        thinkingConfig: { thinkingBudget: 32768 } // Maximum thinking for deep study
+        systemInstruction: systemInstruction,
+        thinkingConfig: { thinkingBudget: 32768 }
       }
     });
 
@@ -260,7 +321,6 @@ export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampl
 }
 
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
-  // Fix thinkingBudget: ensure it is nested within thinkingConfig as per SDK requirements
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Explain the deep sales strategy behind: "${question}" based on the buyer snapshot: ${JSON.stringify(context.snapshot)}. Keep it authoritative and brief.`,
@@ -372,7 +432,22 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       openingLines: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { text: { type: Type.STRING }, label: { type: Type.STRING }, citation: citationSchema }, required: ["text", "label", "citation"] } },
       predictedQuestions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { customerAsks: { type: Type.STRING }, salespersonShouldRespond: { type: Type.STRING }, reasoning: { type: Type.STRING }, category: { type: Type.STRING }, citation: citationSchema }, required: ["customerAsks", "salespersonShouldRespond", "reasoning", "category", "citation"] } },
       strategicQuestionsToAsk: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { question: { type: Type.STRING }, whyItMatters: { type: Type.STRING }, citation: citationSchema }, required: ["question", "whyItMatters", "citation"] } },
-      objectionHandling: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { objection: { type: Type.STRING }, realMeaning: { type: Type.STRING }, strategy: { type: Type.STRING }, exactWording: { type: Type.STRING }, citation: citationSchema }, required: ["objection", "realMeaning", "strategy", "exactWording", "citation"] } },
+      objectionHandling: { 
+        type: Type.ARRAY, 
+        items: { 
+          type: Type.OBJECT, 
+          properties: { 
+            objection: { type: Type.STRING }, 
+            realMeaning: { type: Type.STRING }, 
+            strategy: { type: Type.STRING }, 
+            exactWording: { type: Type.STRING }, 
+            empathyTip: { type: Type.STRING, description: "Coaching tip on how to acknowledge this objection with empathy" },
+            valueTip: { type: Type.STRING, description: "Coaching tip on how to pivot back to value reinforcement" },
+            citation: citationSchema 
+          }, 
+          required: ["objection", "realMeaning", "strategy", "exactWording", "empathyTip", "valueTip", "citation"] 
+        } 
+      },
       toneGuidance: { type: Type.OBJECT, properties: { wordsToUse: { type: Type.ARRAY, items: { type: Type.STRING } }, wordsToAvoid: { type: Type.ARRAY, items: { type: Type.STRING } }, sentenceLength: { type: Type.STRING }, technicalDepth: { type: Type.STRING } }, required: ["wordsToUse", "wordsToAvoid", "sentenceLength", "technicalDepth"] },
       finalCoaching: { type: Type.OBJECT, properties: { dos: { type: Type.ARRAY, items: { type: Type.STRING } }, donts: { type: Type.ARRAY, items: { type: Type.STRING } }, finalAdvice: { type: Type.STRING } }, required: ["dos", "donts", "finalAdvice"] },
       reportSections: {
@@ -402,6 +477,11 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   
   PSYCHOLOGY TASK:
   Provide 0-100 values for: Risk Tolerance, Strategic Priority Focus, Analytical Depth, Directness, Innovation Appetite.
+
+  OBJECTION COACHING TASK:
+  For each objection, provide advanced coaching tips:
+  - empathyTip: An 'Empathy Anchor' (how to validate the customer's perspective without necessarily agreeing with their premise).
+  - valueTip: A 'Value Reinforcement' pivot (how to steer the conversation back to a core unique capability or result mentioned in the documents).
   
   --- SOURCE --- 
   ${filesContent}`;

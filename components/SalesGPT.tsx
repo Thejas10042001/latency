@@ -15,6 +15,8 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const readyFiles = files.filter(f => f.status === 'ready');
+
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -26,6 +28,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
   const handleSend = async () => {
     if (!input.trim() || isProcessing) return;
 
+    const currentHistory = [...messages];
     const userMessage: GPTMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -48,7 +51,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
 
     setMessages(prev => [...prev, assistantMessage]);
 
-    const context = files.filter(f => f.status === 'ready').map(f => f.content).join('\n\n');
+    const context = readyFiles.map(f => `FILE [${f.name}]:\n${f.content}`).join('\n\n');
 
     try {
       if (mode === 'pineapple') {
@@ -57,7 +60,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
           m.id === assistantId ? { ...m, content: imageUrl ? "Here is your generated image:" : "Failed to generate image.", imageUrl: imageUrl || undefined, isStreaming: false } : m
         ));
       } else if (mode === 'deep-study') {
-        const stream = streamDeepStudy(input, context);
+        const stream = streamDeepStudy(input, currentHistory, context);
         let fullText = "";
         for await (const chunk of stream) {
           fullText += chunk;
@@ -67,7 +70,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
         }
         setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, isStreaming: false } : m));
       } else {
-        const stream = streamSalesGPT(input, context);
+        const stream = streamSalesGPT(input, currentHistory, context);
         let fullText = "";
         for await (const chunk of stream) {
           fullText += chunk;
@@ -87,22 +90,49 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
     }
   };
 
+  const clearChat = () => {
+    setMessages([]);
+  };
+
   return (
-    <div className="bg-white border border-slate-200 rounded-[3rem] shadow-2xl h-[700px] flex flex-col overflow-hidden relative">
+    <div className="bg-white border border-slate-200 rounded-[3rem] shadow-2xl h-[800px] flex flex-col overflow-hidden relative">
       {/* GPT Header */}
-      <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg animate-pulse">
-            <ICONS.Sparkles className="w-6 h-6" />
+      <div className="p-8 border-b border-slate-100 flex flex-col gap-4 bg-slate-50/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-600 text-white rounded-2xl shadow-lg animate-pulse">
+              <ICONS.Sparkles className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Sales GPT <span className="text-indigo-600 text-xs font-bold uppercase ml-2 tracking-widest">v3 Flash</span></h3>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unified Intelligence Core</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Sales GPT <span className="text-indigo-600 text-xs font-bold uppercase ml-2 tracking-widest">v3 Flash</span></h3>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unified Intelligence Core</p>
+          <div className="flex gap-3">
+             <button onClick={clearChat} className="px-4 py-2 bg-white text-slate-400 hover:text-rose-500 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
+               Clear Memory
+             </button>
+             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
+                Online
+             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-           <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 text-[10px] font-black uppercase tracking-widest">
-              Online
+
+        {/* Grounding HUD */}
+        <div className="flex items-center gap-4 py-2 px-4 bg-white/50 border border-slate-100 rounded-2xl">
+           <div className="flex items-center gap-2 text-indigo-600">
+              <ICONS.Shield className="w-4 h-4" />
+              <span className="text-[9px] font-black uppercase tracking-widest">Context Grounding</span>
+           </div>
+           <div className="h-4 w-px bg-slate-200"></div>
+           <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+              {readyFiles.length > 0 ? readyFiles.map((f, i) => (
+                <div key={i} className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-widest rounded-lg border border-indigo-100 whitespace-nowrap">
+                   {f.name}
+                </div>
+              )) : (
+                <span className="text-[8px] font-bold text-slate-300 uppercase italic">No documents currently uploaded to memory.</span>
+              )}
            </div>
         </div>
       </div>
@@ -115,12 +145,12 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
                <ICONS.Brain className="w-20 h-20" />
             </div>
             <div className="max-w-md">
-              <h4 className="text-2xl font-black text-slate-800">Ready to Assist</h4>
-              <p className="text-slate-500 mt-2 font-medium">Ask anything from technical deep-dives to document summaries or generate high-quality sales assets.</p>
+              <h4 className="text-2xl font-black text-slate-800">Grounding Ready</h4>
+              <p className="text-slate-500 mt-2 font-medium">I have access to your uploaded documents. Ask me to extract insights, draft pitches, or summarize complex technical requirements.</p>
             </div>
             <div className="grid grid-cols-2 gap-4 w-full max-w-lg">
-               <StarterCard label="Summarize Strategy" onClick={() => setInput("Summarize our current competitive wedge against Cognigy.")} />
-               <StarterCard label="ROI Pitch for CEO" onClick={() => setInput("Draft a 3-point ROI pitch for a Business Executive persona.")} />
+               <StarterCard label="Strategic Wedge" onClick={() => setInput("Based on the docs, what is our best competitive wedge?")} />
+               <StarterCard label="Technical Audit" onClick={() => setInput("Identify all technical requirements mentioned in these files.")} />
             </div>
           </div>
         )}
@@ -138,7 +168,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
                    </span>
                  )}
               </div>
-              <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm font-medium leading-relaxed whitespace-pre-wrap markdown-content">
                 {msg.content}
               </div>
               {msg.imageUrl && (
@@ -206,15 +236,20 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
               ) : (
                 <ICONS.Play className="w-4 h-4" />
               )}
-              {isProcessing ? 'Processing' : 'Execute'}
+              {isProcessing ? 'Thinking' : 'Execute'}
             </button>
           </div>
           
           <p className="text-center text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">
-             Grounding Active • Multimodal Core Connected
+             Conversational History Active • {readyFiles.length} Grounded Source{readyFiles.length !== 1 ? 's' : ''} Linked
           </p>
         </div>
       </div>
+      <style>{`
+        .markdown-content strong { font-weight: 800; color: #1e1b4b; }
+        .markdown-content code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+        .markdown-content ul { list-style-type: disc; margin-left: 20px; margin-top: 10px; }
+      `}</style>
     </div>
   );
 };
