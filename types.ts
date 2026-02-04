@@ -55,7 +55,6 @@ export interface BuyerSnapshot {
   riskTolerance: string;
   riskToleranceCitation: Citation;
   tone: string;
-  // New Psychological Metrics (0-100)
   metrics: {
     riskToleranceValue: number;
     strategicPriorityFocus: number;
@@ -131,7 +130,6 @@ export interface AnalysisResult {
     donts: string[];
     finalAdvice: string;
   };
-  // Special Sections for PDF Report
   reportSections: {
     introBackground: string;
     technicalDiscussion: string;
@@ -165,4 +163,16 @@ export interface MeetingContext {
   baseSystemPrompt: string;
   thinkingLevel: ThinkingLevel;
   temperature: number;
+}
+
+// Sales GPT Types
+export type GPTToolMode = 'standard' | 'pineapple' | 'deep-study';
+
+export interface GPTMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  mode: GPTToolMode;
+  imageUrl?: string;
+  isStreaming?: boolean;
 }

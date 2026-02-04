@@ -103,6 +103,26 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
     }
   };
 
+  /**
+   * Robust JSON parser for final stream buffer
+   */
+  const robustParse = (str: string) => {
+    const trimmed = str.trim();
+    try {
+      return JSON.parse(trimmed);
+    } catch (e) {
+      const match = trimmed.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (innerE) {
+          return null;
+        }
+      }
+      return null;
+    }
+  }
+
   const handleSearch = async (e?: FormEvent, customQuery?: string) => {
     e?.preventDefault();
     const activeQuery = customQuery || query;
@@ -143,12 +163,12 @@ export const CognitiveSearch: FC<CognitiveSearchProps> = ({ files, context }) =>
         }
       }
       
-      try {
-        const finalResult = JSON.parse(fullBuffer);
+      const finalResult = robustParse(fullBuffer);
+      if (finalResult) {
         setResult(finalResult);
         setStreamingText(finalResult.answer);
-      } catch (e) {
-        console.warn("Soft parse failed, fallback to stream state.");
+      } else {
+        console.warn("Soft parse failed at end of stream, keeping partial state.");
       }
       
     } catch (err: any) {

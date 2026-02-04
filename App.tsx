@@ -6,6 +6,7 @@ import { AnalysisView } from './components/AnalysisView';
 import { AudioGenerator } from './components/AudioGenerator';
 import { PracticeSession } from './components/PracticeSession';
 import { CognitiveSearch } from './components/CognitiveSearch';
+import { SalesGPT } from './components/SalesGPT';
 import { MeetingContextConfig } from './components/MeetingContextConfig';
 import { analyzeSalesContext } from './services/geminiService';
 import { AnalysisResult, UploadedFile, MeetingContext, ThinkingLevel } from './types';
@@ -17,9 +18,8 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'practice' | 'audio'>('context');
+  const [activeTab, setActiveTab] = useState<'context' | 'strategy' | 'search' | 'practice' | 'audio' | 'gpt'>('context');
 
-  // Memory Tracker: Fingerprint the state to avoid redundant re-analysis
   const lastAnalyzedHash = useRef<string | null>(null);
 
   const [meetingContext, setMeetingContext] = useState<MeetingContext>({
@@ -63,7 +63,6 @@ const App: React.FC = () => {
 
     const currentHash = generateStateHash();
     
-    // REDUNDANCY CHECK: If data hasn't changed, skip expensive call and use retained results
     if (analysis && currentHash === lastAnalyzedHash.current) {
       setActiveTab('strategy');
       return;
@@ -75,7 +74,6 @@ const App: React.FC = () => {
 
     try {
       const combinedContent = readyFiles.map(f => `FILE: ${f.name}\n${f.content}`).join('\n\n');
-      
       const result = await analyzeSalesContext(combinedContent, meetingContext);
       
       setAnalysis(result);
@@ -167,6 +165,7 @@ const App: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white px-8 py-4 rounded-[2.5rem] shadow-xl border border-slate-100">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
                 <TabBtn active={activeTab === 'strategy'} onClick={() => setActiveTab('strategy')} icon={<ICONS.Document />} label="Brief" />
+                <TabBtn active={activeTab === 'gpt'} onClick={() => setActiveTab('gpt')} icon={<ICONS.Sparkles />} label="Sales GPT" />
                 <TabBtn active={activeTab === 'search'} onClick={() => setActiveTab('search')} icon={<ICONS.Search />} label="Intelligence" />
                 <TabBtn active={activeTab === 'audio'} onClick={() => setActiveTab('audio')} icon={<ICONS.Speaker />} label="Audio" />
                 <TabBtn active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={<ICONS.Chat />} label="Live" />
@@ -184,6 +183,7 @@ const App: React.FC = () => {
             {activeTab === 'context' && <MeetingContextConfig context={meetingContext} onContextChange={setMeetingContext} />}
             {activeTab === 'strategy' && <AnalysisView result={analysis!} files={files} context={meetingContext} />}
             {activeTab === 'search' && <CognitiveSearch files={files} context={meetingContext} />}
+            {activeTab === 'gpt' && <SalesGPT files={files} />}
             {activeTab === 'audio' && <AudioGenerator analysis={analysis!} />}
             {activeTab === 'practice' && <PracticeSession analysis={analysis!} />}
           </div>

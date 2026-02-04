@@ -11,6 +11,32 @@ const THINKING_LEVEL_MAP: Record<ThinkingLevel, number> = {
   'High': 32768
 };
 
+/**
+ * Robustly parses JSON from a string, handling markdown wrappers or trailing characters.
+ */
+function safeJsonParse(str: string) {
+  const trimmed = str.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (e) {
+    // Try to extract the first JSON object match
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch (innerE) {
+        // If it's an array, try to extract array match
+        const arrayMatch = trimmed.match(/\[[\s\S]*\]/);
+        if (arrayMatch) {
+           try { return JSON.parse(arrayMatch[0]); } catch (thirdE) { throw thirdE; }
+        }
+        throw innerE;
+      }
+    }
+    throw e;
+  }
+}
+
 export async function performVisionOcr(base64Data: string, mimeType: string): Promise<string> {
   const modelName = 'gemini-3-pro-preview'; 
   try {
@@ -33,6 +59,88 @@ export async function performVisionOcr(base64Data: string, mimeType: string): Pr
   }
 }
 
+// Sales GPT: Fast Standard Chat
+export async function* streamSalesGPT(prompt: string, context?: string): AsyncGenerator<string> {
+  const modelName = 'gemini-3-flash-preview';
+  const contents = context 
+    ? `CONTEXT FROM DOCUMENTS:\n${context}\n\nUSER QUESTION: ${prompt}`
+    : prompt;
+
+  try {
+    const result = await ai.models.generateContentStream({
+      model: modelName,
+      contents: contents,
+      config: {
+        systemInstruction: "You are Sales GPT, a fast and helpful AI specialized in sales intelligence and general inquiries. Be concise, professional, and authoritative.",
+        thinkingConfig: { thinkingBudget: 0 }
+      }
+    });
+
+    for await (const chunk of result) {
+      yield chunk.text || "";
+    }
+  } catch (error) {
+    console.error("GPT stream failed:", error);
+    yield "Error: Failed to connect to Sales GPT core.";
+  }
+}
+
+// Pineapple: Image Generation
+export async function generatePineappleImage(prompt: string): Promise<string | null> {
+  const modelName = 'gemini-2.5-flash-image';
+  try {
+    const response = await ai.models.generateContent({
+      model: modelName,
+      contents: {
+        parts: [{ text: `Generate a professional, sales-focused high-quality image of: ${prompt}` }],
+      },
+      config: {
+        imageConfig: { aspectRatio: "1:1" }
+      }
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Image generation failed:", error);
+    return null;
+  }
+}
+
+// Deep Study: Heavy Reasoning
+export async function* streamDeepStudy(prompt: string, context?: string): AsyncGenerator<string> {
+  const modelName = 'gemini-3-pro-preview';
+  const contents = context 
+    ? `CONTEXT FOR DEEP RESEARCH:\n${context}\n\nRESEARCH TOPIC: ${prompt}`
+    : prompt;
+
+  try {
+    const result = await ai.models.generateContentStream({
+      model: modelName,
+      contents: contents,
+      config: {
+        systemInstruction: `You are a world-class Research Analyst. 
+        TASK: Perform a deep, detailed study on the topic. 
+        Explain from BASIC to ADVANCED concepts. 
+        Provide data-driven insights, technical depth, and strategic implications. 
+        Be extremely thorough and professional.`,
+        thinkingConfig: { thinkingBudget: 32768 } // Maximum thinking for deep study
+      }
+    });
+
+    for await (const chunk of result) {
+      yield chunk.text || "";
+    }
+  } catch (error) {
+    console.error("Deep Study failed:", error);
+    yield "Error: Deep Study module encountered a logic stall.";
+  }
+}
+
 export interface CognitiveSearchResult {
   answer: string;
   briefExplanation: string;
@@ -50,10 +158,6 @@ export interface CognitiveSearchResult {
   };
 }
 
-/**
- * Low-Latency Cognitive Search using Gemini 3 Flash.
- * Balanced for extreme speed and enhanced reasoning depth.
- */
 export async function* performCognitiveSearchStream(
   question: string, 
   filesContent: string, 
@@ -97,8 +201,6 @@ export async function* performCognitiveSearchStream(
         Think deeply about the hidden motivations of the ${context.persona} persona.
         Avoid clichés. Be authoritative, grounded in source data, and use senior executive vocabulary.`,
         responseMimeType: "application/json",
-        // Enhanced Reasoning: 2048 tokens allows the model to process logic chains 
-        // without significantly slowing down the first-token-to-render time.
         thinkingConfig: { thinkingBudget: 2048 } 
       }
     });
@@ -112,7 +214,6 @@ export async function* performCognitiveSearchStream(
   }
 }
 
-// Backward compatibility for non-streaming calls if needed
 export async function performCognitiveSearch(
   question: string, 
   filesContent: string, 
@@ -123,7 +224,7 @@ export async function performCognitiveSearch(
   for await (const chunk of stream) {
     fullText += chunk;
   }
-  return JSON.parse(fullText || "{}");
+  return safeJsonParse(fullText || "{}");
 }
 
 export async function generateDynamicSuggestions(filesContent: string, context: MeetingContext): Promise<string[]> {
@@ -137,7 +238,7 @@ export async function generateDynamicSuggestions(filesContent: string, context: 
       thinkingConfig: { thinkingBudget: 0 }
     } 
   });
-  return JSON.parse(response.text || "[]");
+  return safeJsonParse(response.text || "[]");
 }
 
 export function decode(base64: string) {
@@ -310,6 +411,6 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
         thinkingConfig: { thinkingBudget: THINKING_LEVEL_MAP[context.thinkingLevel] }
       },
     });
-    return JSON.parse(response.text || "{}") as AnalysisResult;
+    return safeJsonParse(response.text || "{}") as AnalysisResult;
   } catch (error: any) { throw new Error(`Analysis Failed: ${error.message}`); }
 }
