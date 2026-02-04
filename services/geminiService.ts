@@ -142,13 +142,18 @@ export async function* streamSalesGPT(prompt: string, history: GPTMessage[], con
 export async function generatePineappleImage(prompt: string): Promise<string | null> {
   const modelName = 'gemini-2.5-flash-image';
   try {
+    // Strategic prompt wrapping for high-end sales visuals
+    const strategicPrompt = `Create a high-fidelity, enterprise-grade strategic visual asset for: "${prompt}". 
+    The style should be a modern 3D render, minimalist, with soft cinematic lighting and a professional color palette (indigo, slate, emerald). 
+    Avoid cluttered details. Ensure it looks like a slide from a top-tier executive presentation.`;
+
     const response = await ai.models.generateContent({
       model: modelName,
       contents: {
-        parts: [{ text: `Generate a professional, sales-focused high-quality image of: ${prompt}` }],
+        parts: [{ text: strategicPrompt }],
       },
       config: {
-        imageConfig: { aspectRatio: "1:1" }
+        imageConfig: { aspectRatio: "16:9" } // Optimized for presentation slides
       }
     });
 
@@ -173,15 +178,23 @@ export async function* streamDeepStudy(prompt: string, history: GPTMessage[], co
     { role: 'user', parts: [{ text: prompt }] }
   ];
 
-  const systemInstruction = `You are a world-class Strategic Research Analyst. 
-  TASK: Perform a deep, detailed study on the topic using provided document context and reasoning.
+  const systemInstruction = `You are a world-class Strategic Research Lead. 
+  TASK: Conduct an exhaustive Deep Study on the provided topic, synthesizing multiple data points from the grounded context.
   
-  ${context ? `--- DOCUMENT CONTEXT ---
+  RESPONSE ARCHITECTURE:
+  1. EXECUTIVE ABSTRACT: 1-paragraph high-level summary.
+  2. FOUNDATION PRINCIPLES: Define the 'Basic' concepts and terminology relevant to the topic.
+  3. TECHNICAL ARCHITECTURE: Deep-dive into technical details, data structures, or operational mechanics.
+  4. ADVANCED STRATEGIC IMPLICATIONS: Competitive advantages, ROI vectors, or long-term impacts.
+  5. CITATION INDEX: Explicit list of source sections used.
+  
+  STYLE: Thorough, professional, academic but accessible. 
+  
+  ${context ? `--- GROUNDED DOCUMENT CONTEXT ---
   ${context}
-  -----------------------
-  Use the above grounding data for technical depth and strategic analysis.` : ""}
+  -----------------------` : ""}
   
-  Explain from BASIC to ADVANCED concepts. Be extremely thorough and professional.`;
+  Always leverage the thinking budget to find non-obvious connections.`;
 
   try {
     const result = await ai.models.generateContentStream({
@@ -198,7 +211,7 @@ export async function* streamDeepStudy(prompt: string, history: GPTMessage[], co
     }
   } catch (error) {
     console.error("Deep Study failed:", error);
-    yield "Error: Deep Study module encountered a logic stall.";
+    yield "Error: Deep Study reasoning module is unresponsive.";
   }
 }
 
