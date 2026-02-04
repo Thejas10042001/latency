@@ -260,6 +260,7 @@ export async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampl
 }
 
 export async function generateExplanation(question: string, context: AnalysisResult): Promise<string> {
+  // Fix thinkingBudget: ensure it is nested within thinkingConfig as per SDK requirements
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Explain the deep sales strategy behind: "${question}" based on the buyer snapshot: ${JSON.stringify(context.snapshot)}. Keep it authoritative and brief.`,
@@ -297,10 +298,12 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
       threatProfile: { type: Type.STRING, description: "Direct, Indirect, or Niche" },
       strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
       weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+      opportunities: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific opportunities for us to displace them" },
+      threats: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Specific threats they pose to our deal" },
       ourWedge: { type: Type.STRING },
       citation: citationSchema
     },
-    required: ["name", "overview", "threatProfile", "strengths", "weaknesses", "ourWedge", "citation"]
+    required: ["name", "overview", "threatProfile", "strengths", "weaknesses", "opportunities", "threats", "ourWedge", "citation"]
   };
 
   const responseSchema = {
@@ -389,6 +392,10 @@ export async function analyzeSalesContext(filesContent: string, context: Meeting
   
   COMPETITIVE INTELLIGENCE HUB TASK:
   Analyze threat profiles for Cognigy and Amelia based on document clues. 
+  Construct a detailed SWOT analysis for each.
+  - Strengths/Weaknesses: Internal to them.
+  - Opportunities: Areas where WE can displace them or exploit their gaps.
+  - Threats: How they specifically threaten OUR position in this deal.
   
   COGNITIVE GROUND MATRIX TASK:
   Extract exactly 5 foundational truths directly from the documents.

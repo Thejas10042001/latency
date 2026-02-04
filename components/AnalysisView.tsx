@@ -59,34 +59,61 @@ const CognitiveRadarChart = ({ data, size = 320 }: { data: { label: string, valu
   );
 };
 
-const CompetitorCard = ({ comp, name }: { comp: CompetitorInsight, name: string }) => (
-  <div className="p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 hover:bg-white hover:border-indigo-300 hover:shadow-2xl transition-all duration-500 group">
-    <div className="flex items-center justify-between mb-6">
-      <h4 className="text-xl font-black text-slate-900">{name}</h4>
-      <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${comp.threatProfile === 'Direct' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-        {comp.threatProfile} Threat
-      </span>
+const SWOTItem = ({ label, items, color, symbol }: { label: string, items: string[], color: string, symbol: string }) => (
+  <div className={`p-5 rounded-3xl bg-${color}-50/30 border border-${color}-100/50 flex flex-col h-full`}>
+    <div className="flex items-center gap-2 mb-3">
+       <div className={`w-6 h-6 rounded-lg bg-${color}-500 text-white flex items-center justify-center font-black text-[10px]`}>{symbol}</div>
+       <h5 className={`text-[10px] font-black uppercase tracking-widest text-${color}-600`}>{label}</h5>
     </div>
-    <p className="text-xs text-slate-500 font-medium mb-4 italic">“{comp.overview}”</p>
-    <div className="space-y-4">
-      <div>
-        <p className="text-[9px] font-black uppercase text-emerald-600 tracking-widest mb-1">Our Wedge</p>
-        <p className="text-sm font-bold text-slate-800">{comp.ourWedge}</p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+    <ul className="space-y-2">
+      {items.map((item, idx) => (
+        <li key={idx} className="flex gap-2 text-[10px] text-slate-600 leading-relaxed font-medium">
+          <span className={`text-${color}-500 mt-1 shrink-0`}>•</span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
+
+const CompetitorCard = ({ comp, name }: { comp: CompetitorInsight, name: string }) => (
+  <div className="p-10 rounded-[4rem] bg-white border border-slate-100 hover:border-indigo-300 hover:shadow-[0_40px_80px_-15px_rgba(79,70,229,0.12)] transition-all duration-700 group flex flex-col h-full relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+       <ICONS.Trophy className="w-48 h-48" />
+    </div>
+    
+    <div className="flex items-center justify-between mb-8 relative z-10">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow-xl shadow-slate-200">{name[0]}</div>
         <div>
-          <p className="text-[8px] font-black uppercase text-indigo-400 mb-1">Strengths</p>
-          <ul className="text-[10px] text-slate-500 list-disc pl-3">
-            {comp.strengths.slice(0, 3).map((s, i) => <li key={i}>{s}</li>)}
-          </ul>
-        </div>
-        <div>
-          <p className="text-[8px] font-black uppercase text-rose-400 mb-1">Weaknesses</p>
-          <ul className="text-[10px] text-slate-500 list-disc pl-3">
-            {comp.weaknesses.slice(0, 3).map((w, i) => <li key={i}>{w}</li>)}
-          </ul>
+           <h4 className="text-2xl font-black text-slate-900 tracking-tight">{name}</h4>
+           <div className="flex items-center gap-2 mt-1">
+              <span className={`w-2 h-2 rounded-full ${comp.threatProfile === 'Direct' ? 'bg-rose-500' : 'bg-amber-500'}`}></span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{comp.threatProfile} Threat Profile</span>
+           </div>
         </div>
       </div>
+      <div className="text-right">
+         <p className="text-[9px] font-black uppercase text-indigo-500 tracking-widest mb-1">Our Displacement Wedge</p>
+         <p className="text-sm font-bold text-slate-900 border-b-2 border-indigo-100 pb-1">{comp.ourWedge}</p>
+      </div>
+    </div>
+
+    <p className="text-xs text-slate-500 font-medium mb-8 leading-relaxed italic border-l-4 border-slate-100 pl-4">“{comp.overview}”</p>
+
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
+      <SWOTItem label="Strengths" items={comp.strengths || []} color="emerald" symbol="S" />
+      <SWOTItem label="Weaknesses" items={comp.weaknesses || []} color="rose" symbol="W" />
+      <SWOTItem label="Opportunities" items={comp.opportunities || []} color="indigo" symbol="O" />
+      <SWOTItem label="Threats" items={comp.threats || []} color="amber" symbol="T" />
+    </div>
+
+    <div className="mt-8 pt-6 border-t border-slate-50 flex items-center justify-between">
+       <div className="flex items-center gap-2">
+          <ICONS.Document className="w-3 h-3 text-slate-300" />
+          <span className="text-[8px] font-bold text-slate-400 truncate max-w-[150px]">{comp.citation.sourceFile}</span>
+       </div>
+       <button className="text-[9px] font-black uppercase text-indigo-600 tracking-widest hover:text-indigo-800 transition-colors">View Citation Details</button>
     </div>
   </div>
 );
@@ -308,19 +335,51 @@ export const AnalysisView: React.FC<AnalysisViewProps> = ({ result, files, conte
         </div>
       </section>
 
-      {/* Competitive Hub */}
-      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200">
-        <div className="flex items-center gap-4 mb-10">
-          <div className="p-4 bg-rose-600 text-white rounded-2xl"><ICONS.Trophy /></div>
+      {/* Competitive Intelligence Hub with Comparative SWOT */}
+      <section className="bg-white rounded-[4rem] p-12 shadow-2xl border border-slate-200 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 via-indigo-600 to-emerald-500"></div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
           <div>
-            <h2 className="text-3xl font-black text-slate-900">Competitive Intelligence Hub</h2>
-            <p className="text-sm text-slate-500">Deep-dive into inferred and explicit dynamics.</p>
+            <div className="flex items-center gap-4 mb-3">
+               <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-200"><ICONS.Trophy /></div>
+               <h3 className="text-[11px] font-black uppercase tracking-[0.5em] text-indigo-500">Market Intelligence Hub</h3>
+            </div>
+            <h2 className="text-4xl font-black text-slate-900 tracking-tight">Comparative SWOT Analysis</h2>
+            <p className="text-slate-500 mt-2 font-medium max-w-2xl">Deep-dive into inferred and explicit competitive dynamics. This matrix identifies specific vulnerabilities and threat vectors grounded in your documentary data.</p>
+          </div>
+          <div className="flex items-center gap-3 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shadow-sm">
+             <span className="text-[10px] font-black uppercase tracking-widest">Wedge Logic: Enabled</span>
+             <ICONS.Shield className="w-3 h-3" />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
           <CompetitorCard comp={result.competitiveHub.cognigy} name="Cognigy" />
           <CompetitorCard comp={result.competitiveHub.amelia} name="Amelia" />
           {result.competitiveHub.others.map((c, i) => <CompetitorCard key={i} comp={c} name={c.name} />)}
+        </div>
+
+        {/* Tactical Synthesis Footer */}
+        <div className="mt-16 p-10 bg-slate-900 rounded-[3.5rem] text-white relative overflow-hidden group">
+           <div className="absolute top-0 right-0 p-12 opacity-5 translate-x-1/4 -translate-y-1/4 rotate-12 transition-transform group-hover:rotate-0 duration-700"><ICONS.Brain className="w-80 h-80" /></div>
+           <div className="relative z-10 flex flex-col lg:flex-row gap-12 items-center">
+              <div className="flex-1 space-y-4">
+                 <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400">Competitive Synthesis Summary</h4>
+                 <p className="text-2xl font-black leading-tight tracking-tight">
+                    "Exploit Cognigy's {(result.competitiveHub.cognigy.weaknesses[0] || "logic gaps").toLowerCase()} while countering Amelia's {(result.competitiveHub.amelia.strengths[0] || "market presence").toLowerCase()} by anchoring on our {(result.snapshot.priorities[0]?.text || "core value").toLowerCase()} advantage."
+                 </p>
+              </div>
+              <div className="w-full lg:w-fit grid grid-cols-2 gap-4">
+                 <div className="p-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md">
+                    <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Primary Win Vector</p>
+                    <p className="text-xs font-bold text-white/90">Strategic {result.snapshot.personaIdentity.split(' ')[0]} Alignment</p>
+                 </div>
+                 <div className="p-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md">
+                    <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">Critical Block Vector</p>
+                    <p className="text-xs font-bold text-white/90">Competitor Technical Lock-in</p>
+                 </div>
+              </div>
+           </div>
         </div>
       </section>
 

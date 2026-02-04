@@ -40,6 +40,8 @@ export interface CompetitorInsight {
   threatProfile: 'Direct' | 'Indirect' | 'Niche';
   strengths: string[];
   weaknesses: string[];
+  opportunities: string[]; // Where we can displace them
+  threats: string[]; // How they might win
   ourWedge: string;
   citation: Citation;
 }
