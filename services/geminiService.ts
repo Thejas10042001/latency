@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, MeetingContext, ThinkingLevel, GPTMessage } from "../types";
 
@@ -237,8 +236,8 @@ export async function* performCognitiveSearchStream(
   filesContent: string, 
   context: MeetingContext
 ): AsyncGenerator<string> {
-  const modelName = 'gemini-3-flash-preview';
-  const styleDirectives = context.answerStyles.map(style => `- Create a section exactly titled "### ${style}"`).join('\n');
+  const modelName = 'gemini-3-pro-preview'; // UPGRADED to PRO for depth
+  const styleDirectives = context.answerStyles.map(style => `- Create a section exactly titled "### ${style}" and provide EXHAUSTIVE, multi-paragraph detail. Do not be brief.`).join('\n');
 
   const prompt = `MEETING INTELLIGENCE CONTEXT:
   - Seller: ${context.sellerNames} from ${context.sellerCompany}
@@ -246,8 +245,13 @@ export async function* performCognitiveSearchStream(
   - Focus: ${context.meetingFocus}
   - Strategy: ${context.executiveSnapshot}
   
-  TASK: Synthesize a high-density, persona-aligned response to: "${question}". 
-  Provide a rigorous analysis that uncovers non-obvious strategic links.
+  TASK: Synthesize a maximum-depth, high-reasoning, persona-aligned response to: "${question}". 
+  Provide a rigorous, in-depth analysis that uncovers complex strategic patterns and non-obvious links.
+  
+  ENFORCED DEPTH REQUIREMENTS:
+  - Every requested header MUST contain at least 2-3 detailed paragraphs of reasoning.
+  - Connect findings across multiple documents.
+  - If technical gaps are identified, explain the specific architectural or business risk.
   
   REQUIRED STRUCTURE:
   ${styleDirectives}
@@ -258,8 +262,8 @@ export async function* performCognitiveSearchStream(
   JSON OUTPUT SCHEMA (MUST BE VALID):
   {
     "articularSoundbite": "Powerful 1-sentence verbatim hook for the salesperson.",
-    "briefExplanation": "2-3 sentence high-level strategic executive summary.",
-    "answer": "The full detailed analysis following requested headers with Markdown.",
+    "briefExplanation": "1-2 paragraph strategic executive summary of the reasoning.",
+    "answer": "The full, exhaustive detailed analysis following requested headers with Markdown elaboration.",
     "psychologicalProjection": { "buyerFear": "...", "buyerIncentive": "...", "strategicLever": "..." },
     "citations": [ { "snippet": "...", "source": "..." } ],
     "reasoningChain": { "painPoint": "...", "capability": "...", "strategicValue": "..." }
@@ -271,11 +275,12 @@ export async function* performCognitiveSearchStream(
       contents: prompt,
       config: {
         systemInstruction: `You are a world-class Senior Cognitive Sales Strategist. 
-        Your goal is to provide ADVANCED reasoning depth while maintaining ultra-low latency. 
-        Think deeply about the hidden motivations of the ${context.persona} persona.
-        Avoid clichés. Be authoritative, grounded in source data, and use senior executive vocabulary.`,
+        TASK: Produce encyclopedia-level depth and technical rigor. 
+        You have a high thinking budget; USE IT to find deep correlations in the documentation.
+        Avoid all brevity. Be authoritative, academic, and extremely thorough. 
+        Analyze the hidden motivations of the ${context.persona} persona with extreme detail.`,
         responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 2048 } 
+        thinkingConfig: { thinkingBudget: 32768 } // MAX BUDGET for highest depth
       }
     });
 
@@ -284,7 +289,7 @@ export async function* performCognitiveSearchStream(
     }
   } catch (error) {
     console.error("Streaming search failed:", error);
-    throw new Error("Cognitive Engine failed to synthesize. Check source integrity.");
+    throw new Error("Cognitive Engine failed to synthesize deep reasoning. Source may be too complex or model limit reached.");
   }
 }
 

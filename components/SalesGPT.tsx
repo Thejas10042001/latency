@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, FC } from 'react';
 import { ICONS } from '../constants';
 import { streamSalesGPT, generatePineappleImage, streamDeepStudy } from '../services/geminiService';
@@ -113,7 +112,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
               <ICONS.Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Sales GPT <span className="text-indigo-600 text-xs font-bold uppercase ml-2 tracking-widest">v3 Flash</span></h3>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Fast Answering <span className="text-indigo-600 text-xs font-bold uppercase ml-2 tracking-widest">v3 Flash</span></h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Unified Intelligence Core</p>
             </div>
           </div>
@@ -170,7 +169,7 @@ export const SalesGPT: FC<SalesGPTProps> = ({ files }) => {
               <div className="flex items-center justify-between mb-4">
                  <div className="flex items-center gap-3">
                    <span className={`text-[9px] font-black uppercase tracking-widest ${msg.role === 'user' ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                      {msg.role === 'user' ? 'Architect' : msg.mode === 'deep-study' ? 'Research Core' : 'Sales GPT Core'}
+                      {msg.role === 'user' ? 'Architect' : msg.mode === 'deep-study' ? 'Research Core' : 'Fast Answering Core'}
                    </span>
                    {msg.mode === 'deep-study' && msg.role === 'assistant' && (
                      <span className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[8px] font-black uppercase tracking-widest border border-amber-200">
